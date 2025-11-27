@@ -2,83 +2,142 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>炫彩粒子互動系統</title>
+<!-- 引入 Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
     :root {
         --c-cyan: #00f3ff; --c-fire: #ff5e00; --c-matrix: #39ff14;
         --c-ice: #00c3ff; --c-pink: #ff00ff; --c-dark: #020205;
-        --c-panel: rgba(10, 15, 20, 0.9); --btn-clr: #fff;
+        --c-panel: rgba(10, 15, 20, 0.85); --btn-clr: #fff; --c-rec: #ff3b3b;
     }
     body {
         margin: 0; background: var(--c-dark); color: #fff;
         font-family: 'Segoe UI', sans-serif; overflow: hidden;
-        height: 100vh; user-select: none;
+        height: 100vh; width: 100vw; user-select: none;
     }
-    #mirror-container {
-        position: absolute; inset: 0; transform: scaleX(-1); z-index: 1;
-    }
-    video, canvas {
-        position: absolute; inset: 0; width: 100%; height: 100%;
-    }
+
+    /* 鏡像與畫布容器 */
+    #mirror-container { position: absolute; inset: 0; transform: scaleX(-1); z-index: 1; }
+    video, canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
     video { object-fit: cover; opacity: 0; transition: opacity 0.5s; z-index: 1; }
     canvas { z-index: 2; }
+
+    /* 背景網格 */
     .grid-bg {
         position: absolute; inset: 0; z-index: 0;
         background-image: linear-gradient(#00f3ff08 1px, transparent 1px),
                           linear-gradient(90deg, #00f3ff08 1px, transparent 1px);
         background-size: 50px 50px; pointer-events: none;
     }
+
+    /* UI 層 */
     #ui-layer {
         position: absolute; inset: 0; z-index: 10; pointer-events: none;
         display: flex; flex-direction: column; justify-content: space-between;
     }
+
+    /* 頂部控制列 */
     #top-controls {
-        padding: 25px; display: flex; justify-content: center; gap: 8px;
+        padding: 20px; display: flex; justify-content: center; align-items: center; gap: 8px;
         opacity: 0; transform: translateY(-20px); transition: 0.6s;
-        background: linear-gradient(to bottom, #000c, transparent);
+        background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+        flex-wrap: wrap; 
     }
     #top-controls.visible { opacity: 1; transform: translateY(0); }
+
+    /* 通用按鈕樣式 */
     .tech-btn {
-        background: #0009; border: 1px solid var(--btn-clr); color: var(--btn-clr);
-        padding: 10px 24px; font-weight: 600; letter-spacing: 1.5px;
-        cursor: pointer; transition: 0.2s; pointer-events: auto;
-        clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+        background: rgba(0,0,0,0.6); border: 1px solid var(--btn-clr); color: var(--btn-clr);
+        height: 40px; display: flex; align-items: center; justify-content: center;
+        font-size: 14px; cursor: pointer; transition: 0.2s; pointer-events: auto;
+        clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+        backdrop-filter: blur(4px);
     }
-    .tech-btn:hover { background: #ffffff26; box-shadow: 0 0 15px var(--btn-clr); transform: translateY(-2px); }
+    .btn-icon { width: 45px; font-size: 18px; }
+    .btn-text { padding: 0 16px; font-weight: 600; letter-spacing: 1px; }
+
+    .tech-btn:hover { background: rgba(255,255,255,0.15); box-shadow: 0 0 15px var(--btn-clr); transform: translateY(-2px); }
+    .tech-btn:active { transform: scale(0.95); }
     .tech-btn.active { background: var(--btn-clr); color: #000; font-weight: 800; box-shadow: 0 0 20px var(--btn-clr); }
+    
+    /* 錄影燈號 */
+    .tech-btn.recording { 
+        background: var(--c-rec); border-color: var(--c-rec); color: #fff; 
+        box-shadow: 0 0 15px var(--c-rec); animation: pulse 1.5s infinite; 
+    }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+
+    /* 配色 */
     .btn-neon { --btn-clr: var(--c-cyan); } .btn-fire { --btn-clr: var(--c-fire); }
     .btn-matrix { --btn-clr: var(--c-matrix); } .btn-ice { --btn-clr: var(--c-ice); }
     .btn-pink { --btn-clr: var(--c-pink); }
-    .divider { width: 2px; height: 24px; background: #444; margin: 0 15px; transform: skewX(-20deg); }
+    .divider { width: 1px; height: 24px; background: #555; margin: 0 8px; transform: skewX(-20deg); }
+
+    /* --- 啟動面板 (修正置中問題) --- */
     .start-panel {
-        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-        text-align: center; background: var(--c-panel); border: 1px solid var(--c-cyan);
-        padding: 60px 80px; backdrop-filter: blur(10px); z-index: 20;
+        position: absolute; top: 50%; left: 50%; 
+        transform: translate(-50%, -50%);
+        /* 使用 Flexbox 強制內容置中 */
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        
+        background: var(--c-panel); border: 1px solid var(--c-cyan);
+        padding: 60px 100px; /* 加寬 padding 讓畫面更大氣 */
+        backdrop-filter: blur(10px); z-index: 20;
         clip-path: polygon(20px 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%, 0 20px);
-        box-shadow: 0 0 50px #00f3ff26; transition: 0.5s;
+        box-shadow: 0 0 50px rgba(0, 243, 255, 0.15); transition: 0.5s;
+        max-width: 90vw;
     }
-    .start-panel h1 { font-size: 3.5rem; text-shadow: 0 0 20px var(--c-cyan); letter-spacing: 8px; font-weight: 200; margin: 0 0 10px; }
-    .start-panel p { color: var(--c-cyan); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 40px; }
-    .btn-large { padding: 18px 50px; font-size: 18px; --btn-clr: var(--c-cyan); }
+    .start-panel h1 { 
+        font-size: 3.5rem; color: #fff; text-shadow: 0 0 20px var(--c-cyan); 
+        letter-spacing: 8px; font-weight: 200; margin: 0 0 15px 0; text-align: center;
+        white-space: nowrap;
+    }
+    .start-panel p { 
+        color: var(--c-cyan); letter-spacing: 3px; text-transform: uppercase; 
+        margin-bottom: 45px; font-size: 1.1rem; text-align: center;
+    }
+    /* 啟動按鈕專用樣式 */
+    .btn-large { 
+        width: auto; 
+        padding: 15px 60px; 
+        font-size: 20px; 
+        --btn-clr: var(--c-cyan); 
+        margin: 0; /* 移除可能導致偏移的 margin */
+    }
+
+    /* 吉祥物 */
     .mascot-container {
         position: absolute; bottom: 60px; left: 30px; width: 140px; cursor: grab;
         pointer-events: auto; z-index: 100; touch-action: none; transition: transform 0.1s;
     }
     .mascot-container:active { cursor: grabbing; transform: scale(0.95); }
-    .mascot-container img { width: 100%; display: block; filter: drop-shadow(0 0 8px #fff6); pointer-events: none; }
-    .mascot-label {
-        position: absolute; top: -30px; left: 50%; transform: translateX(-50%);
-        background: #000c; border: 1px solid var(--c-cyan); color: var(--c-cyan);
-        font-size: 11px; padding: 4px 12px; border-radius: 20px;
-        opacity: 0; transition: 0.3s; pointer-events: none; white-space: nowrap;
-    }
-    .mascot-container:hover .mascot-label { opacity: 1; }
+    .mascot-container img { width: 100%; display: block; filter: drop-shadow(0 0 8px rgba(255,255,255,0.4)); pointer-events: none; }
+
+    /* Footer */
     .footer {
-        text-align: center; padding: 15px 0 20px; font-size: 13px; color: #666;
+        text-align: center; padding: 10px 0 20px; font-size: 12px; color: #666;
         letter-spacing: 1.5px; background: linear-gradient(to top, #000 30%, transparent); pointer-events: auto;
     }
     .footer span { color: #999; font-weight: bold; }
+
+    /* --- 響應式調整 (Mobile) --- */
+    @media (max-width: 768px) {
+        .start-panel { padding: 40px 30px; width: 80%; }
+        .start-panel h1 { font-size: 1.8rem; letter-spacing: 2px; white-space: normal; line-height: 1.3; }
+        .start-panel p { font-size: 0.9rem; margin-bottom: 30px; }
+        .btn-large { font-size: 16px; padding: 12px 40px; }
+        
+        #top-controls { padding: 10px; gap: 5px; }
+        .tech-btn { height: 36px; font-size: 13px; }
+        .btn-icon { width: 40px; }
+        .btn-text { padding: 0 10px; }
+        .mascot-container { width: 100px; bottom: 50px; left: 15px; }
+    }
 </style>
 </head>
 <body>
@@ -87,24 +146,32 @@
         <video id="vid" autoplay playsinline muted></video>
         <canvas id="cvs"></canvas>
     </div>
+    
     <div id="ui-layer">
         <div id="top-controls">
-            <button class="tech-btn btn-pink" id="camBtn" onclick="toggleCam()">隱藏鏡頭</button>
+            <!-- 工具 -->
+            <button class="tech-btn btn-icon" onclick="snap()" title="拍照"><i class="fas fa-camera"></i></button>
+            <button class="tech-btn btn-icon" id="recBtn" onclick="toggleRec()" title="錄影"><i class="fas fa-video"></i></button>
             <div class="divider"></div>
-            <button class="tech-btn btn-neon active" onclick="setPal('neon', this)">霓虹</button>
-            <button class="tech-btn btn-fire" onclick="setPal('fire', this)">火焰</button>
-            <button class="tech-btn btn-matrix" onclick="setPal('matrix', this)">駭客</button>
-            <button class="tech-btn btn-ice" onclick="setPal('ice', this)">冰霜</button>
+            <button class="tech-btn btn-pink btn-text" id="camBtn" onclick="toggleCam()">隱藏</button>
+            <div class="divider"></div>
+            <!-- 風格 -->
+            <button class="tech-btn btn-neon btn-text active" onclick="setPal('neon', this)">霓虹</button>
+            <button class="tech-btn btn-fire btn-text" onclick="setPal('fire', this)">火焰</button>
+            <button class="tech-btn btn-matrix btn-text" onclick="setPal('matrix', this)">駭客</button>
+            <button class="tech-btn btn-ice btn-text" onclick="setPal('ice', this)">冰霜</button>
         </div>
+
         <div class="start-panel" id="start">
             <h1>炫彩粒子互動系統</h1>
             <p>Motion Particle System</p>
             <button class="tech-btn btn-large" onclick="init()">啟動系統 START</button>
         </div>
+
         <div class="mascot-container" id="mascot">
-            <div class="mascot-label">LiyuChillGuy</div>
             <img src="image/LiyuChillGuy.svg" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/React.svg/512px-React.svg.png'" alt="Mascot">
         </div>
+
         <div class="footer">Copyright © <span>Liyuchiutiger Gongminshen</span></div>
     </div>
 
@@ -112,7 +179,12 @@
         const $ = id => document.getElementById(id);
         const vid = $('vid'), cvs = $('cvs'), ctx = cvs.getContext('2d', { alpha: true });
         const mCvs = document.createElement('canvas'), mCtx = mCvs.getContext('2d', { willReadFrequently: true });
+        const recCvs = document.createElement('canvas'), recCtx = recCvs.getContext('2d');
         
+        let mediaRec, chunks = [], recording = false;
+        let w, h, ch = 75, parts = [], prevData = null;
+        let active = false, showVid = true;
+
         const CFG = {
             cw: 100, limit: 1200, thresh: 30, spawn: 3,
             pals: {
@@ -122,9 +194,7 @@
                 ice: ['#00c3ff', '#ffffff', '#0066ff']
             }
         };
-
-        let w, h, ch = 75, parts = [], prevData = null;
-        let active = false, showVid = true, curPal = CFG.pals.neon;
+        let curPal = CFG.pals.neon;
 
         class P {
             constructor(x, y) {
@@ -149,6 +219,7 @@
         const resize = () => {
             w = cvs.width = window.innerWidth;
             h = cvs.height = window.innerHeight;
+            recCvs.width = w; recCvs.height = h;
             if (vid.videoWidth) {
                 ch = Math.floor(CFG.cw * (vid.videoHeight / vid.videoWidth));
                 mCvs.width = CFG.cw; mCvs.height = ch;
@@ -158,30 +229,34 @@
 
         window.setPal = (n, el) => {
             curPal = CFG.pals[n];
-            document.querySelectorAll('#top-controls .tech-btn:not(#camBtn)').forEach(b => b.classList.remove('active'));
-            el.classList.add('active');
+            document.querySelectorAll('#top-controls .btn-text:not(#camBtn)').forEach(b => b.classList.remove('active'));
+            if(el) el.classList.add('active');
         };
 
         window.toggleCam = () => {
             showVid = !showVid;
             vid.style.opacity = showVid ? '1' : '0';
-            const b = $('camBtn');
-            b.innerText = showVid ? "隱藏鏡頭" : "顯示鏡頭";
-            b.classList.toggle('active', !showVid);
+            const btn = $('camBtn');
+            btn.innerText = showVid ? "隱藏" : "顯示";
+            btn.classList.toggle('active', !showVid);
         };
 
         window.init = async () => {
             try {
-                const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 640 }, audio: false });
+                const s = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } }, 
+                    audio: false 
+                });
                 vid.srcObject = s;
                 vid.onloadedmetadata = () => {
                     vid.play(); active = true; resize();
                     const st = $('start');
-                    st.style.transform = "translate(-50%, -60%) scale(0.9)"; st.style.opacity = 0;
+                    st.style.transform = "translate(-50%, -60%) scale(0.9)"; 
+                    st.style.opacity = 0; st.style.pointerEvents = "none";
                     setTimeout(() => { st.style.display = 'none'; $('top-controls').classList.add('visible'); }, 500);
                     loop();
                 };
-            } catch { alert("無法啟動攝影機"); }
+            } catch (e) { console.error(e); alert("無法啟動攝影機，請確認權限。"); }
         };
 
         const detect = () => {
@@ -189,15 +264,61 @@
             mCtx.drawImage(vid, 0, 0, CFG.cw, ch);
             const d = mCtx.getImageData(0, 0, CFG.cw, ch).data;
             if (!prevData) { prevData = d; return; }
-
             for (let i = 0; i < d.length; i += 16) {
                 if (Math.abs(d[i+1] - prevData[i+1]) > CFG.thresh && parts.length < CFG.limit) {
                     const pi = i / 4, rx = (pi % CFG.cw) * (w / CFG.cw), ry = Math.floor(pi / CFG.cw) * (h / ch);
-                    for (let k = 0; k < CFG.spawn; k++) parts.push(new P(rx + (Math.random() * 20 - 10), ry + (Math.random() * 20 - 10)));
+                    for (let k = 0; k < CFG.spawn; k++) parts.push(new P(rx + (Math.random()*20-10), ry + (Math.random()*20-10)));
                 }
             }
             prevData = d;
         };
+
+        const drawComposite = () => {
+            recCtx.clearRect(0, 0, w, h);
+            recCtx.save();
+            recCtx.translate(w, 0); recCtx.scale(-1, 1); 
+            if (showVid) {
+                const rScreen = w / h, rVideo = vid.videoWidth / vid.videoHeight;
+                let dw, dh, dx, dy;
+                if (rScreen > rVideo) { dw = w; dh = w / rVideo; dx = 0; dy = (h - dh) / 2; } 
+                else { dh = h; dw = h * rVideo; dy = 0; dx = (w - dw) / 2; }
+                recCtx.drawImage(vid, dx, dy, dw, dh);
+            } else {
+                recCtx.fillStyle = '#020205'; recCtx.fillRect(0, 0, w, h);
+            }
+            recCtx.drawImage(cvs, 0, 0);
+            recCtx.restore();
+        };
+
+        window.snap = () => {
+            drawComposite();
+            const link = document.createElement('a');
+            link.download = `Particle_Snap_${Date.now()}.png`;
+            link.href = recCvs.toDataURL('image/png');
+            link.click();
+        };
+
+        window.toggleRec = () => {
+            const btn = $('recBtn'), icon = btn.querySelector('i');
+            if (recording) {
+                mediaRec.stop(); recording = false;
+                btn.classList.remove('recording'); icon.className = "fas fa-video";
+            } else {
+                recording = true; chunks = [];
+                btn.classList.add('recording'); icon.className = "fas fa-stop";
+                const stream = recCvs.captureStream(30);
+                mediaRec = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9' });
+                mediaRec.ondataavailable = e => { if(e.data.size > 0) chunks.push(e.data); };
+                mediaRec.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'video/webm' });
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob); a.download = `Particle_Rec_${Date.now()}.webm`; a.click();
+                };
+                mediaRec.start(); recLoop();
+            }
+        };
+
+        const recLoop = () => { if (recording) { drawComposite(); requestAnimationFrame(recLoop); } };
 
         const loop = () => {
             if (!active) return;
@@ -216,11 +337,10 @@
         let drag = false, sx, sy, ix, iy;
         const getP = e => e.touches ? e.touches[0] : e;
         const start = e => {
-            if (e.target.className === 'mascot-label') return;
             e.preventDefault(); drag = true;
             const p = getP(e); sx = p.clientX; sy = p.clientY;
             const r = mas.getBoundingClientRect(); ix = r.left; iy = r.top;
-            mas.style.cssText = `left:${ix}px; top:${iy}px; bottom:auto; right:auto; cursor:grabbing;`;
+            mas.style.cssText = `left:${ix}px; top:${iy}px; bottom:auto; right:auto; cursor:grabbing; width:${mas.offsetWidth}px`;
         };
         const move = e => {
             if (!drag) return;
